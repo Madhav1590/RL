@@ -660,36 +660,17 @@ def train(config: TrainConfig):
         ts_step = time.time()
         batch = next(trainloader_iter)
 
-        (
-            states,
-            actions,
-            returns,
-            rewards,
-            d,
-            time_steps,
-            mask,
-        ), best_traj_range = batch
+        (states, actions, returns, rewards, d, time_steps, mask, ), best_traj_range = batch
         padding_mask = mask
 
-        predicted_actions = model(
-            states=states,
-            actions=actions,
-            rewards=rewards,
-            d=d,
-            returns_to_go=returns,
-            time_steps=time_steps,
-            padding_mask=padding_mask,
-        )
+        predicted_actions = model(states=states, actions=actions, 
+                                  rewards=rewards, d=d, 
+                                  returns_to_go=returns, time_steps=time_steps, 
+                                  padding_mask=padding_mask, )
 
-        best_episode_mask = (
-            torch.arange(config.batch_size // accelerator.num_processes)[:, None],
-            best_traj_range,
-        )
-        loss = F.mse_loss(
-            predicted_actions[best_episode_mask],
-            actions[best_episode_mask].detach(),
-            reduction="none",
-        )
+        best_episode_mask = ( torch.arange(config.batch_size // accelerator.num_processes)[:, None], best_traj_range, )
+        
+        loss = F.mse_loss( predicted_actions[best_episode_mask], actions[best_episode_mask].detach(), reduction="none", )
         # [batch_size, seq_len, action_dim] * [batch_size, seq_len, 1]
         mask = F.tanh(mask[best_episode_mask]) + 1
         loss = (loss * mask.unsqueeze(-1)).mean()
